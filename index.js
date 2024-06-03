@@ -18,7 +18,7 @@ function Sifaka(backend, options) {
     this.cachePolicy = options.cachePolicy || new (require("./cache_policies/static"))();
     this.statsInterval = options.statsInterval || 0;
     this.serializer = options.serializer || null;
-    this.stats = {hit: 0, miss: 0, work: 0};
+    this.stats = {hit: 0, miss: 0, work: 0, stale: 0};
     this.name = options.name || null;
     this.lockTimeoutMs = options.lockTimeoutMs || 120 * 1000;
     this.pendingTimeoutMs = options.pendingTimeoutMs || this.lockTimeoutMs;
@@ -109,6 +109,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
             if(state.hit === true) {
                 self.stats.hit++;
                 self.debug(key, "CACHE HIT");
+                self.emit("result", {"result": "hit", "key": key, "data": data});
 
                 if(options.metaOnly === "hit") {
                     // Pass "data" through here - so that we can verify in the tests that the backends are returning
@@ -123,6 +124,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                 // check if we need to refresh the data in the background
                 if(state.stale) {
                     self.stats.stale++;
+                    self.emit("result", {"result": "stale", "key": key, "data": data});
                     if(!self._hasLocalLock(key)) {
                         self.backend.lock(key, null, function (err, acquired) {
                             if(acquired) {
@@ -139,6 +141,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                 }
             } else {
                 self.stats.miss++;
+                self.emit("result", {"result": "miss", "key": key});
                 if(options.metaOnly === "miss") {
                     // We don't need to wait for a result to be calculated, or trigger one
                     self.debug(key, "META ONLY CACHE MISS");
@@ -217,6 +220,7 @@ Sifaka.prototype._pendingTimedOut = function (key) {
         delete this.pendingTimeouts[key];
         this.debug(key, "PENDING TIMED OUT");
         this._resolvePendingCallbacks(key, new Error("Timed Out"), null, {}, false, {});
+        self.emit("timeout", {"key": key});
     }
 };
 
@@ -376,6 +380,7 @@ Sifaka.prototype._doWork = function (key, options, workFunction, state, callback
                             }, function (storedError, storedResult) {
                                 self._removeLocalLock(key);
                                 self._resolvePendingCallbacks(key, workError, data, extra, true, state);
+                                self.emit("workDone", {"key": key, "error": workError, "data": serializedData});
                                 if(storedCallback) {
                                     storedCallback(storedError, storedResult);
                                 }
@@ -407,7 +412,7 @@ Sifaka.prototype._logStats = function () {
         self._logStats()
     }, this.statsInterval);
     currentStats.duration = this.lastStats - lastStats;
-    this.stats = {hit: 0, miss: 0, work: 0};
+    this.stats = {hit: 0, miss: 0, work: 0, stale: 0};
     this.emit("stats", currentStats);
 };
 Sifaka.prototype._resolvePendingCallbacks = function (key, err, data, extra, didWork, state) {
