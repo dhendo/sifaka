@@ -109,7 +109,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
             if(state.hit === true) {
                 self.stats.hit++;
                 self.debug(key, "CACHE HIT");
-                self.emit("result", {"result": "hit", "key": key, "data": data});
+                self.emit("result", {"result": "hit", "key": key, "options": options, "extra": extra});
 
                 if(options.metaOnly === "hit") {
                     // Pass "data" through here - so that we can verify in the tests that the backends are returning
@@ -124,7 +124,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                 // check if we need to refresh the data in the background
                 if(state.stale) {
                     self.stats.stale++;
-                    self.emit("result", {"result": "stale", "key": key, "data": data});
+                    self.emit("result", {"result": "stale", "key": key, "options": options, "extra": extra});
                     if(!self._hasLocalLock(key)) {
                         self.backend.lock(key, null, function (err, acquired) {
                             if(acquired) {
@@ -141,7 +141,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                 }
             } else {
                 self.stats.miss++;
-                self.emit("result", {"result": "miss", "key": key});
+                self.emit("result", {"result": "miss", "key": key, "options": options, "extra": extra});
                 if(options.metaOnly === "miss") {
                     // We don't need to wait for a result to be calculated, or trigger one
                     self.debug(key, "META ONLY CACHE MISS");
@@ -380,7 +380,7 @@ Sifaka.prototype._doWork = function (key, options, workFunction, state, callback
                             }, function (storedError, storedResult) {
                                 self._removeLocalLock(key);
                                 self._resolvePendingCallbacks(key, workError, data, extra, true, state);
-                                self.emit("workDone", {"key": key, "error": workError, "data": serializedData});
+                                self.emit("workDone", {"key": key, "error": workError, "options": options, "extra": serializedExtra});
                                 if(storedCallback) {
                                     storedCallback(storedError, storedResult);
                                 }
