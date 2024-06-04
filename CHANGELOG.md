@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
+## [0.8.15] - 2024-06-04
+
+### Changed
+
+Added additional events to allow detailed monitoring on cache performance. Listen for them using `sifaka.on([event type], [callback])`
+
+These new events are:
+
+- `"result"`: Raised when the cache backend responds with a request. The "result" field of the event data will indicate whether it was a cache "hit" or cache "miss".
+- `"workDone"`: Raised whenever the workFunction has been called, either because of a cache miss or to refresh a stale value.
+- `"timeout"`: Raised whenever a request to the cache failed to be handled before timing out.
+
 ## [0.8.13] - 2017-07-17
 
 ### Changed
