@@ -220,7 +220,7 @@ Sifaka.prototype._pendingTimedOut = function (key) {
         delete this.pendingTimeouts[key];
         this.debug(key, "PENDING TIMED OUT");
         this._resolvePendingCallbacks(key, new Error("Timed Out"), null, {}, false, {});
-        self.emit("timeout", {"key": key});
+        this.emit("timeout", {"key": key});
     }
 };
 
