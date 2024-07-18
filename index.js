@@ -131,7 +131,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                                 self._setLocalLock(key);
                                 self.debug(key, "GOT LOCK FOR STALE REFRESH");
                                 self._doWork(key, options, workFn, state);
-                            } else {stperception.io:9100/metrics
+                            } else {
                                 self.debug(key, "LOCK DENIED FOR STALE REFRESH"); // Another worker is doing the refresh
                             }
                         });
