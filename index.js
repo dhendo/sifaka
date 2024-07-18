@@ -109,7 +109,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
             if(state.hit === true) {
                 self.stats.hit++;
                 self.debug(key, "CACHE HIT");
-                self.emit("result", {"result": "hit", "key": key, "options": options, "extra": extra});
+                self.emit("result", {"result": "hit", "key": key, "options": options, "extra": extra}, "hitmain");
 
                 if(options.metaOnly === "hit") {
                     // Pass "data" through here - so that we can verify in the tests that the backends are returning
@@ -124,14 +124,14 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                 // check if we need to refresh the data in the background
                 if(state.stale) {
                     self.stats.stale++;
-                    self.emit("result", {"result": "stale", "key": key, "options": options, "extra": extra});
+                    self.emit("result", {"result": "stale", "key": key, "options": options, "extra": extra}, "stalerefresh");
                     if(!self._hasLocalLock(key)) {
                         self.backend.lock(key, null, function (err, acquired) {
                             if(acquired) {
                                 self._setLocalLock(key);
                                 self.debug(key, "GOT LOCK FOR STALE REFRESH");
                                 self._doWork(key, options, workFn, state);
-                            } else {
+                            } else {stperception.io:9100/metrics
                                 self.debug(key, "LOCK DENIED FOR STALE REFRESH"); // Another worker is doing the refresh
                             }
                         });
@@ -141,7 +141,7 @@ Sifaka.prototype.get = function (key, workFn, options, callback) {
                 }
             } else {
                 self.stats.miss++;
-                self.emit("result", {"result": "miss", "key": key, "options": options, "extra": extra});
+                self.emit("result", {"result": "miss", "key": key, "options": options, "extra": extra}, "missmain");
                 if(options.metaOnly === "miss") {
                     // We don't need to wait for a result to be calculated, or trigger one
                     self.debug(key, "META ONLY CACHE MISS");
@@ -241,11 +241,11 @@ Sifaka.prototype._checkForBackendResult = function (key) {
 
     this.backend.get(key, {noLock: true}, function (err, data, state, extra) {
         if(state.hit) {
-            
+
             if(self._hasRemoteLockCheck(key)) {
                 self._removeRemoteLockCheck(key);
             }
-            
+
             if(err) {
                 if(typeof err === "string") {
                     err = new Error(err);
@@ -263,7 +263,7 @@ Sifaka.prototype._checkForBackendResult = function (key) {
                     if(acquired) {
                         self._setLocalLock(key);
                         self.debug(key, "GOT LOCK AFTER REMOTE LOCK");
-                        
+
                         if(self.remoteLockChecks[key] && self.remoteLockChecks[key].workFn) {
                             return self._doWork(key, self.remoteLockChecks[key].options, self.remoteLockChecks[key].workFn, self.remoteLockChecks[key].state, function () {
                                 if(self._hasRemoteLockCheck(key)) {
@@ -288,14 +288,14 @@ Sifaka.prototype._checkForBackendResult = function (key) {
             } else {
                 // Otherwise schedule another check, backing off as necessary
                 var nextInterval;
-                
-                
+
+
                 if(!self.remoteLockChecks[key]){
                     // The backend check has been removed elsewhere. Throwing is unlikely to be productive, as it will be unlikely to be caught.
                     self.debug(key, "ERROR - Attempted to set next lock check on a removed remote lock check. NS: "+self.namespace);
                     return;
                 }
-                
+
                 if(self.lockCheckBackoffExponent === 1) {
                     nextInterval = self.lockCheckIntervalMs + (self.remoteLockChecks[key].count * (self.lockCheckBackoff));
                 } else {
@@ -380,7 +380,7 @@ Sifaka.prototype._doWork = function (key, options, workFunction, state, callback
                             }, function (storedError, storedResult) {
                                 self._removeLocalLock(key);
                                 self._resolvePendingCallbacks(key, workError, data, extra, true, state);
-                                self.emit("workDone", {"key": key, "error": workError, "options": options, "extra": serializedExtra});
+                                self.emit("workDone", {"key": key, "error": workError, "options": options, "extra": serializedExtra}, "maincallback");
                                 if(storedCallback) {
                                     storedCallback(storedError, storedResult);
                                 }
