@@ -15,22 +15,32 @@ suite('Redis Backend', function () {
     });
 
     setup(function (done) {
-        var host = "localhost";
-        client = redis.createClient({host: host, return_buffers: true, prefix: "sifaka-test:"});
-        client.on("error", function(e){
-            if(e.code == "ECONNREFUSED"){
-               // throw new Error("No redis server available at " + host);
-            }
-        });
-        var multi = client.multi();
-        client.del("test:data:abc");
-        client.del("test:lock:abc");
-        multi.exec(function (err, data) {
-            done();
-            if(err) {
-                throw err;
-            }
-        });
+        try {
+            var host = "localhost";
+            client = redis.createClient({socket: {host: host}, legacyMode: true},);
+            client.on("error", function (e) {
+                if (e.code == "ECONNREFUSED") {
+                    throw new Error("No redis server available at " + host);
+                }
+            });
+            client.connect().then(() => {
+
+                var multi = client.multi();
+                client.del("test:data:abc");
+                client.del("test:lock:abc");
+                multi.exec(function (err, data) {
+                    done();
+                    if (err) {
+                        throw err;
+                    }
+                });
+            }).catch((e) => {
+              done(e)
+            });
+        } catch (e) {
+            throw e;
+        }
+
     });
 
     test('should contain a get method', function (done) {
