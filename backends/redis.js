@@ -120,17 +120,17 @@ Redis.prototype._getPipeline = function (key, metaOnly) {
     let multi = self.client.multi();
 
     // Lock first
-    multi.GET(self.namespace + "lock:" + key);
+    multi.get(self.namespace + "lock:" + key);
 
     // If we want the data back, we can do a hgetall
     if(!metaOnly || metaOnly === "miss") {
-        multi.HGETALL(self.namespace + "data:" + key);
+        multi.hGetAll(self.namespace + "data:" + key);
     } else {
         // Otherwise load the other fields individually
-        multi.HGET(self.namespace + "data:" + key, "expiry");
-        multi.HGET(self.namespace + "data:" + key, "stale");
-        multi.HGET(self.namespace + "data:" + key, "error");
-        multi.HGET(self.namespace + "data:" + key, "extra");
+        multi.hGet(self.namespace + "data:" + key, "expiry");
+        multi.hGet(self.namespace + "data:" + key, "stale");
+        multi.hGet(self.namespace + "data:" + key, "error");
+        multi.hGet(self.namespace + "data:" + key, "extra");
     }
 
     return multi;
@@ -214,7 +214,7 @@ Redis.prototype.lock = function (key, options, callback) {
 
         let lockID = options.lockID || self.lockID;
 
-        this.client.SET(this.namespace + "lock:" + key, lockID, "NX", "EX", (this.lockExpiryTime || 60), function (err, data) {
+        this.client.set(this.namespace + "lock:" + key, lockID, "NX", "EX", (this.lockExpiryTime || 60), function (err, data) {
 
             if(err) {
                 err.cached = false;
@@ -243,7 +243,7 @@ Redis.prototype.lock = function (key, options, callback) {
 Redis.prototype.unlock = function (key, options, callback) {
     let self = this;
     if(self.client_available()) {
-        this.client.EVAL(unlock_script, 1, this.namespace + "lock:" + key, self.lockID, function (err, data) {
+        this.client.eval(unlock_script, 1, this.namespace + "lock:" + key, self.lockID, function (err, data) {
             if(err) {
                 err.cached = false;
                 err.cacheUnavailable = true;
@@ -293,7 +293,7 @@ Redis.prototype.store = function (key, value, extra, error, cachePolicyResult, o
     if(self.client_available()) {
         let multi = self.client.multi();
         if(value !== null && typeof value !== "undefined") {
-            multi.HSET(self.namespace + "data:" + key, "data", value);
+            multi.hSet(self.namespace + "data:" + key, "data", value);
         }
 
         if(extra !== null && typeof extra !== "undefined") {
@@ -302,17 +302,17 @@ Redis.prototype.store = function (key, value, extra, error, cachePolicyResult, o
                 extra = JSON.stringify(extra);
             }
 
-            multi.HSET(self.namespace + "data:" + key, "extra", extra);
+            multi.hSet(self.namespace + "data:" + key, "extra", extra);
         } else {
-            multi.HSET(self.namespace + "data:" + key, "extra", "{}");
+            multi.hSet(self.namespace + "data:" + key, "extra", "{}");
         }
         if(error) {
             error = error.message ? error.message : error.toString();
-            multi.HSET(self.namespace + "data:" + key, "error", error);
+            multi.hSet(self.namespace + "data:" + key, "error", error);
         }
-        multi.HSET(self.namespace + "data:" + key, "stale", staleAbs);
-        multi.HSET(self.namespace + "data:" + key, "expiry", expiryAbs);
-        multi.PEXPIREAT(self.namespace + "data:" + key, expiryAbs.toFixed());
+        multi.hSet(self.namespace + "data:" + key, "stale", staleAbs);
+        multi.hSet(self.namespace + "data:" + key, "expiry", expiryAbs);
+        multi.pExpireAt(self.namespace + "data:" + key, expiryAbs.toFixed());
 
         multi.exec(function (err, replies) {
             if(err) {
